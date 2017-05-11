@@ -41,6 +41,41 @@ class ImageHash
     }
 
     /**
+     * Calculate a multiple perceptual hash of an image file.
+     *
+     * @param  string $resource filename
+     * @return array|bool
+     */
+    public function multipleHash($resource)
+    {
+        if (is_resource($resource)) {
+            return false;
+        }
+
+        list($resource_width, $resource_height) = getimagesize($resource);
+        $resource = $this->loadImageResource($resource);
+
+        $left_resource = imagecreatetruecolor($resource_width / 2, $resource_height);
+        $right_resource = imagecreatetruecolor($resource_width / 2, $resource_height);
+        imagecopy($left_resource, $resource, 0, 0, 0, 0, $resource_width / 2, $resource_height);
+        imagecopy($right_resource, $resource, 0, 0, $resource_width / 2, 0, $resource_width / 2, $resource_height);
+
+        $full_hash = $this->implementation->hash($resource);
+        $left_hash = $this->implementation->hash($left_resource);
+        $right_hash = $this->implementation->hash($right_resource);
+
+        $this->destroyResource($resource);
+        $this->destroyResource($left_resource);
+        $this->destroyResource($right_resource);
+
+        return [
+            'full' => $this->formatHash($full_hash),
+            'left' => $this->formatHash($left_hash),
+            'right' => $this->formatHash($right_hash)
+        ];
+    }
+
+    /**
      * Calculate a perceptual hash of an image file.
      *
      * @param  mixed $resource GD2 resource or filename
@@ -79,6 +114,25 @@ class ImageHash
         $this->destroyResource($resource);
 
         return $this->formatHash($hash);
+    }
+
+    /**
+     * Compare 2 images and get the hamming distance.
+     *
+     * @param  mixed $resource1
+     * @param  mixed $resource2
+     * @return array
+     */
+    public function multipleCompare($resource1, $resource2)
+    {
+        $hash1 = $this->multipleHash($resource1);
+        $hash2 = $this->multipleHash($resource2);
+
+        return [
+            'full_distance' => $this->distance($hash1['full'], $hash2['full']),
+            'left_part_distance' => $this->distance($hash1['left'], $hash2['left']),
+            'right_part_distance' => $this->distance($hash1['right'], $hash2['right'])
+        ];
     }
 
     /**
